@@ -24,7 +24,7 @@ void push(Queue* q, Node* node) {
 Node* pop(Queue* q) {
 
 	if (q->head == NULL) {
-		return;
+		return NULL;
 	}
 	/*if (q->head->next == NULL) {
 		Node* temp = q->head;

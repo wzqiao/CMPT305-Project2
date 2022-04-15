@@ -8,7 +8,7 @@ public:
 	string instruction;
 	Node* next;
 
-	Node(string instruction) {};
+	Node(string instruction);
 };
 
 class Queue {
@@ -16,7 +16,7 @@ public:
 	Node* head;
 	Node* tail;
 
-	Queue() {};
+	Queue();
 };
 
 void push(Queue* q, Node* node);
