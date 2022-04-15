@@ -1,1 +1,5 @@
-
+#
+*.sin
+*.vcxproj
+*.filters
+*.user
