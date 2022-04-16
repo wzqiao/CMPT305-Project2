@@ -140,7 +140,7 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 						push(IDQueue, IFQueue->head);
 						continue;
 					}
-					//有分支指令 停止IF to ID 停止IF 等该指令通过EX
+					//有分支指令 不停止IF to ID 停止IF 停止其他指令ID to EX 等该指令通过EX
 					stop_tag_branch = true;
 					break;
 				}
@@ -151,8 +151,8 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 				
 				//检查是否满足数据相关性
 				bool is_satisfied = false;
+				is_satisfied = check_data_dependence(IDQueue, WBQueue, IDQueue->head);
 				//满足数据相关性后
-				is_satisfied = check_data_dependence(IFQueue, WBQueue, IFQueue->head);
 				if (is_satisfied) {
 					//ID to EX 
 					//这里少判断条件
