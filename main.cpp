@@ -121,6 +121,9 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 							temp->instruction.push_back(token);
 						}
 						push_back(IFQueue, temp);
+						if (temp->instruction[1] == "3") {
+							stop_tag_branch = true;
+						}
 						IFQueue->size++;
 						line_count++;
 
@@ -136,13 +139,19 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 				for (int i = 0; i < width; i++) {
 					
 					//如果指令是分支指令停止IF指令的获取直到该指令过EX
-					if (IFQueue->head->instruction[1] != "3") {
+					/*if (IFQueue->head->instruction[1] != "3") {
 						push(IDQueue, IFQueue->head);
 						continue;
-					}
+					}*/
 					//有分支指令 不停止IF to ID 停止IF 停止其他指令ID to EX 等该指令通过EX
-					stop_tag_branch = true;
-					break;
+					if (IFQueue->head->instruction[1] == "3") {
+						stop_tag_branch = true;
+						push(IDQueue, IFQueue->head);
+					}
+					if (!stop_tag_branch) {
+						push(IDQueue, IFQueue->head);
+					}
+					//break;
 				}
 
 				//ID 阶段 指令解码和读取操作数 
