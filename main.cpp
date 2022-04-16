@@ -24,7 +24,7 @@
 //Queue* MEMQueue = new Queue();
 //Queue* WBQueue = new Queue();
 
-bool check_data_dependence(Queue* q, Node* node) {
+bool check_data_dependence(Queue* q,Queue* wbq, Node* node) {
 	//遍历IFQueue,检查所需数据是否将要被更改
 	//将要更改就waiting直到更改结束（过WB）
 	//IFQueue一般不会太长 for循环嵌套应该没事
@@ -78,7 +78,8 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 	Queue* EXQueue = new Queue();
 	Queue* MEMQueue = new Queue();
 	Queue* WBQueue = new Queue();
-
+	//是否可以用WBQueue代替
+	Queue* after_WBQueue = new Queue();
 
 	ifstream infile;
 	infile.open(file_name, ifstream::in);
@@ -132,10 +133,19 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 			// An instruction cannot go to EX until all its data dependences are satisfied
 			//一条指令在满足其所有数据相关性之前不能进入 EX
 			//检查是否满足数据相关性
-			bool is_satisfied = check_data_dependence(IFQueue, IFQueue->head);
+			bool is_satisfied = check_data_dependence(IFQueue, WBQueue, IFQueue->head);
 
+			//满足数据相关性后
+			//IF to ID
+			push(IDQueue, IFQueue->head);
 
+			if (is_satisfied) {
+				//ID to EX
+				push(EXQueue, IDQueue->head);
+			}
+			
 			//EX 阶段指令发出和执行
+			
 			
 			//
 		}
