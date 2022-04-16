@@ -17,12 +17,6 @@
 #include <sstream>
 //using namespace std;
 
-//create 5 stages queue
-//Queue* IFQueue = new Queue();
-//Queue* IDQueue = new Queue();
-//Queue* EXQueue = new Queue();
-//Queue* MEMQueue = new Queue();
-//Queue* WBQueue = new Queue();
 
 bool check_data_dependence(Queue* q,Queue* wbq, Node* node) {
 	//遍历IFQueue,检查所需数据是否将要被更改
@@ -93,6 +87,7 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 		int line_count = 0;
 
 		bool stop_tag_branch = false; //true is stop instruction fetch. false do nothing
+		bool is_satisfied = false;
 		while (line_count < total_simulate_lines)
 		{
 			//line_count == 0 说明已经开始操作了，外面这个getline会导致多读一行
@@ -143,15 +138,16 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 						push(IDQueue, IFQueue->head);
 						continue;
 					}*/
-					//有分支指令 不停止IF to ID 停止IF 停止其他指令ID to EX 等该指令通过EX
+					//有分支指令 不停止IF to ID? 停止IF 停止其他指令ID to EX 等该指令通过EX
 					if (IFQueue->head->instruction[1] == "3") {
 						stop_tag_branch = true;
 						push(IDQueue, IFQueue->head);
+						pop(IFQueue);
+						break;
 					}
-					if (!stop_tag_branch) {
-						push(IDQueue, IFQueue->head);
-					}
-					//break;
+					//普通指令进入ID
+					push(IDQueue, IFQueue->head);
+					pop(IFQueue);
 				}
 
 				//ID 阶段 指令解码和读取操作数 
@@ -159,18 +155,22 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 				//一条指令在满足其所有数据相关性之前不能进入 EX
 				
 				//检查是否满足数据相关性
-				bool is_satisfied = false;
-				is_satisfied = check_data_dependence(IDQueue, WBQueue, IDQueue->head);
-				//满足数据相关性后
-				if (is_satisfied) {
-					//ID to EX 
-					//这里少判断条件
-					push(EXQueue, IDQueue->head);
+				for (int i = 0; i < width; i++) {
+					is_satisfied = check_data_dependence(IDQueue, WBQueue, IDQueue->head);
+					//满足数据相关性后
+					if (is_satisfied) {
+						//ID to EX 
+						// 
+						//这里少判断条件?
+
+						push(EXQueue, IDQueue->head);
+						pop(IDQueue);
+					}
 				}
 				//只有一个整数ALU的话，好像不管w是多少第一个使用整数ALU的指令push进EXQueue
 				// 都会使后面的使用整数ALU的指令等待
 				//EX 阶段指令发出和执行
-
+				//stop_tag_branch在过EX后变为false
 
 				//
 			}
