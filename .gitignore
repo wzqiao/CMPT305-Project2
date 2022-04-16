@@ -5,5 +5,8 @@
 *.user
 *.vs
 *.idea
+*.gz
+Debug
+
 srv_0
 x64
