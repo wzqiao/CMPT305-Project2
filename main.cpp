@@ -91,63 +91,80 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 		start_line--;
 		int current_line_infile = 0;
 		int line_count = 0;
+
+		bool stop_tag_branch = false; //true is stop instruction fetch. false do nothing
 		while (line_count < total_simulate_lines)
 		{
 			//line_count == 0 说明已经开始操作了，外面这个getline会导致多读一行
-			if (line_count == 0){
+			if (line_count == 0) {
 				getline(infile, content);
 			}
 
 			//start push instruction into pipeline
-			if (current_line_infile >= start_line && line_count<total_simulate_lines) {
+			if (current_line_infile >= start_line && line_count < total_simulate_lines) {
+				if (!stop_tag_branch) {
+					//创建w个node， 一次读取w个指令
+					for (int i = 0; i < width; i++) {
+						getline(infile, content);
+						//vStr.push_back(content);
 
-				//创建w个node， 一次读取w个指令
-				for (int i = 0; i < width; i++) {
-					getline(infile, content);
-					//vStr.push_back(content);
-					
-					//cout << content << endl;
+						//cout << content << endl;
 
-					//分割字符串
-					stringstream sstr(content);
-					string token;
-					Node* temp = new Node();
-					while (getline(sstr, token, ',')) {
-						//cout << token << endl;
-						//IF 阶段 指令获取
-						
-						temp->instruction.push_back(token);
+						//分割字符串
+						stringstream sstr(content);
+						string token;
+						Node* temp = new Node();
+						while (getline(sstr, token, ',')) {
+							//cout << token << endl;
+							//IF 阶段 指令获取
+
+							temp->instruction.push_back(token);
+						}
+						push_back(IFQueue, temp);
+						IFQueue->size++;
+						line_count++;
+
+
 					}
-					push_back(IFQueue, temp);
-					IFQueue->size++;
-					line_count++;
-
-
 				}
+				current_line_infile++;
+				cout << "current line in file: " << current_line_infile << endl;
+
+				
+				
+				//IF to ID
+				for (int i = 0; i < width; i++) {
+					
+					//如果指令是分支指令停止IF指令的获取直到该指令过EX
+					if (IFQueue->head->instruction[1] != "3") {
+						push(IDQueue, IFQueue->head);
+						continue;
+					}
+					//有分支指令 停止IF to ID 停止IF 等该指令通过EX
+					stop_tag_branch = true;
+					break;
+				}
+
+				//ID 阶段 指令解码和读取操作数 
+				// An instruction cannot go to EX until all its data dependences are satisfied
+				//一条指令在满足其所有数据相关性之前不能进入 EX
+				
+				//检查是否满足数据相关性
+				bool is_satisfied = false;
+				//满足数据相关性后
+				is_satisfied = check_data_dependence(IFQueue, WBQueue, IFQueue->head);
+				if (is_satisfied) {
+					//ID to EX 
+					//这里少判断条件
+					push(EXQueue, IDQueue->head);
+				}
+				//只有一个整数ALU的话，好像不管w是多少第一个使用整数ALU的指令push进EXQueue
+				// 都会使后面的使用整数ALU的指令等待
+				//EX 阶段指令发出和执行
+
+
+				//
 			}
-			//cout << 2 << endl;
-			current_line_infile++;
-			cout << "current line in file: " << current_line_infile << endl;
-
-			//ID 阶段 指令解码和读取操作数 
-			// An instruction cannot go to EX until all its data dependences are satisfied
-			//一条指令在满足其所有数据相关性之前不能进入 EX
-			//检查是否满足数据相关性
-			bool is_satisfied = check_data_dependence(IFQueue, WBQueue, IFQueue->head);
-
-			//满足数据相关性后
-			//IF to ID
-			push(IDQueue, IFQueue->head);
-
-			if (is_satisfied) {
-				//ID to EX
-				push(EXQueue, IDQueue->head);
-			}
-			
-			//EX 阶段指令发出和执行
-			
-			
-			//
 		}
 		//cout << IFQueue->head->instruction[1] << endl;
 		//cout << IFQueue->head->next->instruction[1] << endl;
