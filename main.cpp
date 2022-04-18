@@ -24,6 +24,9 @@ bool check_data_dependence(Queue* q,Queue* wbq, Node* node) {
 	//IFQueue一般不会太长 for循环嵌套应该没事
 	int result = 0;
 	Queue* temp = q;
+	Queue* temp2 = wbq;
+	temp->first = temp->head;
+	temp2->first = temp2->head;
 	//size < 2 说明没有数据依赖
 	if (node->instruction.size() > 2) {
 		for (int j = 2; j < node->instruction.size(); j++) {
@@ -31,7 +34,9 @@ bool check_data_dependence(Queue* q,Queue* wbq, Node* node) {
 				if (node->instruction[j] == temp->head->instruction[0]) {
 					result++;
 				}
+				temp->first = temp->first->next;
 			}
+			temp->first = temp->head;
 		}
 
 		//所有数据依赖在IFQueue里找到
@@ -42,15 +47,24 @@ bool check_data_dependence(Queue* q,Queue* wbq, Node* node) {
 		//如果IFQueue里没有,遍历 过WBQueue    IFQueue里没有 只能从这里找
 	//过WBQueue里储存着曾经完成WB的指令地址
 	//可用多线程搜索
-		
+		for (int j = 2; j < node->instruction.size(); j++) {
+			for (int i = 0; i < q->size; i++) {
+				if (node->instruction[j] == temp->head->instruction[0]) {
+					result++;
+				}
+				temp2->first = temp2->first->next;
+			}
+			temp2->first = temp2->head;
+		}
 		//所有数据依赖在IFQueue和过WBQueue里找到
 		if(result == node->instruction.size() - 2) {
 			return true;
 		}
+		return false;
 	}
 	
 
-	return false;
+	return true;
 }
 
 void simulation(string file_name, int width, int start_line, int total_simulate_lines) {
@@ -75,6 +89,8 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 	//是否可以用WBQueue代替
 	Queue* after_WBQueue = new Queue();
 
+
+	int circles = 0;
 	ifstream infile;
 	infile.open(file_name, ifstream::in);
 	if (infile.is_open()) {
@@ -93,11 +109,14 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 			//line_count == 0 说明已经开始操作了，外面这个getline会导致多读一行
 			if (line_count == 0) {
 				getline(infile, content);
+				current_line_infile++;
 			}
-
+			//cout << 1 << endl;
+			//cout << "current line in file: " << current_line_infile << endl;
 			//start push instruction into pipeline
 			if (current_line_infile >= start_line && line_count < total_simulate_lines) {
 				if (!stop_tag_branch) {
+					//cout << 2 << endl;
 					//创建w个node， 一次读取w个指令
 					for (int i = 0; i < width; i++) {
 						getline(infile, content);
@@ -116,69 +135,183 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 							temp->instruction.push_back(token);
 						}
 						push_back(IFQueue, temp);
-						if (temp->instruction[1] == "3") {
+						/*if (temp->instruction[1] == "3") {
 							stop_tag_branch = true;
-						}
+						}*/
 						IFQueue->size++;
 						line_count++;
-
+						current_line_infile++;
 
 					}
 				}
-				current_line_infile++;
+				
 				cout << "current line in file: " << current_line_infile << endl;
+				cout << IFQueue->head->instruction[0] << endl; //ffff000008082890,3,ffff00000808288c
+				//cout << stop_tag_branch << endl; 0, false
+				cout << "IFQueue->size: " << IFQueue->size << endl;
 
-				
-				
+
+				IFQueue->first = IFQueue->head;
 				//IF to ID
 				for (int i = 0; i < width; i++) {
 					
 					//如果指令是分支指令停止IF指令的获取直到该指令过EX
-					/*if (IFQueue->head->instruction[1] != "3") {
-						push(IDQueue, IFQueue->head);
-						continue;
-					}*/
 					//有分支指令 不停止IF to ID? 停止IF 停止其他指令ID to EX 等该指令通过EX
-					if (IFQueue->head->instruction[1] == "3") {
-						stop_tag_branch = true;
-						push(IDQueue, IFQueue->head);
+					/*if (IFQueue->head == NULL) {
+						push(IDQueue, IFQueue->first);
 						pop(IFQueue);
-						break;
-					}
+					}*/
 					//普通指令进入ID
 					push(IDQueue, IFQueue->head);
 					pop(IFQueue);
-				}
+					if (IFQueue->first != NULL) {
+						if (IFQueue->first->instruction[1] == "3") {
+							stop_tag_branch = true;
+							push(IDQueue, IFQueue->first);
+							//pop(IFQueue);
+							remove(IFQueue, IFQueue->first);
+							break;
+						}
 
+					}
+				}
+				IDQueue->first = IDQueue->head;
+
+				
 				//ID 阶段 指令解码和读取操作数 
 				// An instruction cannot go to EX until all its data dependences are satisfied
 				//一条指令在满足其所有数据相关性之前不能进入 EX
 				
 				//检查是否满足数据相关性
 				for (int i = 0; i < width; i++) {
-					is_satisfied = check_data_dependence(IDQueue, WBQueue, IDQueue->head);
+					is_satisfied = check_data_dependence(IDQueue, WBQueue, IDQueue->first);
 					//满足数据相关性后
 					if (is_satisfied) {
 						//ID to EX 
 						// 
 						//这里少判断条件?
-
-						push(EXQueue, IDQueue->head);
-						pop(IDQueue);
+						//cout << IDQueue->head->instruction[0] << endl;
+						push(EXQueue, IDQueue->first);
+						//pop(IDQueue);
+						remove(IDQueue, IDQueue->first);
+					}
+					if (IDQueue->first->next != NULL) {
+						IDQueue->first = IDQueue->first->next;
 					}
 				}
 				//只有一个整数ALU的话，好像不管w是多少第一个使用整数ALU的指令push进EXQueue
 				// 都会使后面的使用整数ALU的指令等待
 				//EX 阶段指令发出和执行
 				//stop_tag_branch在过EX后变为false
+				
+				if (EXQueue->head != NULL) {
+					if (EXQueue->head->next != NULL) {
+						EXQueue->first = EXQueue->head->next;
+					}
+				}
 
-				//
+				for (int i = 0; i < width; i++) {
+					if (EXQueue->head != NULL) {
+						if (EXQueue->head->instruction[1] == "3") {
+							push(MEMQueue, EXQueue->head);
+							pop(EXQueue);
+							stop_tag_branch = false;
+							break;
+						}
+
+						//同时用一个功能单元
+						if (EXQueue->first != NULL) {
+							if (EXQueue->head->instruction[1] == EXQueue->first->instruction[1]) {
+								push(MEMQueue, EXQueue->head);
+								pop(EXQueue);
+								break;
+							}
+						}
+					}
+					if (EXQueue->head == NULL) {
+						break;
+					}
+					//不共用一个功能单元，正常输出
+					push(MEMQueue, EXQueue->head);
+					pop(EXQueue);
+					if (EXQueue->head == NULL) {
+						break;
+					}
+					if (EXQueue->head->next != NULL) {
+						EXQueue->first = EXQueue->head->next;
+					}
+					
+				}
+				
+				
+				//cout << "1111111" << endl;
+				//MEM
+				if (MEMQueue->head != NULL) {
+					if (MEMQueue->head->next != NULL) {
+						MEMQueue->first = MEMQueue->head->next;
+					}
+				}
+				for (int i = 0; i < width; i++) {
+					//同时用一个功能单元
+					if (MEMQueue->first != NULL) {
+						if (MEMQueue->head->instruction[1] == MEMQueue->first->instruction[1]) {
+							push(WBQueue, MEMQueue->head);
+							pop(MEMQueue);
+							break;
+						}
+					}
+					if (MEMQueue->head == NULL) {
+						break;
+					}
+					push(WBQueue, MEMQueue->head);
+					pop(MEMQueue);
+					if (MEMQueue->head == NULL) {
+						break;
+					}
+					if (MEMQueue->head->next != NULL) {
+						MEMQueue->first = MEMQueue->head->next;
+					}
+				}
+				
+				//WB
+				if (WBQueue->head != NULL) {
+					if (WBQueue->head->next != NULL) {
+						WBQueue->first = WBQueue->head->next;
+					}
+				}
+				for (int i = 0; i < width; i++) {
+					//同时用一个功能单元
+					if (WBQueue->first != NULL) {
+						if (WBQueue->head->instruction[1] == WBQueue->first->instruction[1]) {
+							push(after_WBQueue, WBQueue->head);
+							pop(WBQueue);
+							break;
+						}
+					}
+					if (WBQueue->head == NULL) {
+						break;
+					}
+					//cout << WBQueue->head->instruction[0] << endl;
+					push(after_WBQueue, WBQueue->head);
+					pop(WBQueue);
+					if (WBQueue->head == NULL) {
+						break;
+					}
+					if (WBQueue->head->next != NULL) {
+						WBQueue->first = WBQueue->head->next;
+					}
+				}
+				
+				//cout << after_WBQueue->tail->instruction[0] << endl;
 			}
+			circles++;
 		}
 		//cout << IFQueue->head->instruction[1] << endl;
 		//cout << IFQueue->head->next->instruction[1] << endl;
-		/*cout << "line count: " << line_count << endl;
-		for (auto line : vStr)
+		cout << "line count: " << line_count << endl;
+		cout << "Total line: " << total_simulate_lines << endl;
+		cout << circles << endl;
+		/*for (auto line : vStr)
 		{
 			cout << line << endl;
 		}*/
@@ -193,8 +326,8 @@ int main(int argc, char* argv[]) {
 	//string filename = "test.txt";
 
 	int width = 1;
-	int start_line = 2;
-	int total_line = 2;
+	int start_line = 0;
+	int total_line = 30;
 
 
 	cout << "start simulation" << endl;

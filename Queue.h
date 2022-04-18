@@ -27,6 +27,7 @@ class Queue {
 public:
 	Node* head;
 	Node* tail;
+	Node* first;
 	int size;
 	Queue();
 };
@@ -34,3 +35,4 @@ public:
 void push(Queue* q, Node* node);
 void push_back(Queue* q, Node* node);
 Node* pop(Queue* q);
+void remove(Queue* q, Node* node);

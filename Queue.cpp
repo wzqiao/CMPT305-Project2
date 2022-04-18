@@ -15,6 +15,7 @@ Node::Node(string instruction_PC, string instruction_type, string instruction_de
 Queue::Queue() {
 	this->head = NULL;
 	this->tail = NULL;
+	this->first = NULL;
 }
 
 void push(Queue* q, Node* node) {
@@ -24,7 +25,7 @@ void push(Queue* q, Node* node) {
 	}
 	else {
 		q->tail = node;
-		q->tail->next = NULL;
+		//q->tail->next = NULL;
 	}
 }
 
@@ -58,4 +59,24 @@ Node* pop(Queue* q) {
 		q->size--;
 		return temp;
 	}
+}
+
+void remove(Queue* q, Node* node) {
+	if (q->head == NULL) {
+		return;
+	}
+	if (q->head == node) {
+		q->head = node->next;
+		return;
+	}
+	Queue* temp = new Queue();
+	temp = q;
+	while (temp->head->next != node) {
+		//
+		if (temp->head->next == NULL) {
+			return;
+		}
+		temp->head = temp->head->next;
+	}
+	temp->head->next = node->next;
 }
