@@ -70,17 +70,27 @@ void remove(Queue* q, Node* node) {
 		return;
 	}
 	if (q->head == node) {
-		q->head = node->next;
+		//q->head = node->next;
+		pop(q);
 		return;
 	}
-	Queue* temp = new Queue();
-	temp = q;
-	while (temp->head->next != node) {
-		//
-		if (temp->head->next == NULL) {
+	/*Queue* temp = new Queue();
+	temp = q;*/
+	//while (temp->head->next != node) {
+	//	//
+	//	if (temp->head->next == NULL) {
+	//		return;
+	//	}
+	//	temp->head = temp->head->next;
+	//}
+	//temp->head->next = node->next;
+	Node* temp_node = new Node();
+	temp_node = q->head;
+	while (temp_node->next != node) {
+		if (temp_node->next == NULL) {
 			return;
 		}
-		temp->head = temp->head->next;
+		temp_node = temp_node->next;
 	}
-	temp->head->next = node->next;
+	temp_node->next = node->next;
 }
