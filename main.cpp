@@ -23,8 +23,10 @@ bool check_data_dependence(Queue* q,Queue* wbq, Node* node) {
 	//将要更改就waiting直到更改结束（过WB）
 	//IFQueue一般不会太长 for循环嵌套应该没事
 	int result = 0;
-	Queue* temp = q;
-	Queue* temp2 = wbq;
+	Queue* temp = new Queue();
+	temp = q;
+	Queue* temp2 = new Queue();
+	temp2 = wbq;
 	temp->first = temp->head;
 	temp2->first = temp2->head;
 	//size < 2 说明没有数据依赖
@@ -144,11 +146,11 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 
 					}
 				}
-				
+				cout << "after_WBQueue->size: " << after_WBQueue->size << endl;
 				cout << "current line in file: " << current_line_infile << endl;
 				cout << IFQueue->head->instruction[0] << endl; //ffff000008082890,3,ffff00000808288c
 				//cout << stop_tag_branch << endl; 0, false
-				cout << "IFQueue->size: " << IFQueue->size << endl;
+				//cout << "IFQueue->size: " << IFQueue->size << endl;
 
 
 				IFQueue->first = IFQueue->head;
@@ -162,8 +164,7 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 						pop(IFQueue);
 					}*/
 					//普通指令进入ID
-					push(IDQueue, IFQueue->head);
-					pop(IFQueue);
+					
 					if (IFQueue->first != NULL) {
 						if (IFQueue->first->instruction[1] == "3") {
 							stop_tag_branch = true;
@@ -172,12 +173,13 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 							remove(IFQueue, IFQueue->first);
 							break;
 						}
-
 					}
+					push(IDQueue, IFQueue->head);
+					pop(IFQueue);
 				}
 				IDQueue->first = IDQueue->head;
 
-				
+				cout << IDQueue->head->instruction[0] << endl;
 				//ID 阶段 指令解码和读取操作数 
 				// An instruction cannot go to EX until all its data dependences are satisfied
 				//一条指令在满足其所有数据相关性之前不能进入 EX
@@ -199,12 +201,15 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 						IDQueue->first = IDQueue->first->next;
 					}
 				}
+
+				
 				//只有一个整数ALU的话，好像不管w是多少第一个使用整数ALU的指令push进EXQueue
 				// 都会使后面的使用整数ALU的指令等待
 				//EX 阶段指令发出和执行
 				//stop_tag_branch在过EX后变为false
 				
 				if (EXQueue->head != NULL) {
+					cout << EXQueue->head->instruction[0] << endl;
 					if (EXQueue->head->next != NULL) {
 						EXQueue->first = EXQueue->head->next;
 					}
@@ -247,6 +252,7 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 				//cout << "1111111" << endl;
 				//MEM
 				if (MEMQueue->head != NULL) {
+					cout << MEMQueue->head->instruction[0] << endl;
 					if (MEMQueue->head->next != NULL) {
 						MEMQueue->first = MEMQueue->head->next;
 					}
@@ -273,8 +279,11 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 					}
 				}
 				
+				
+				
 				//WB
 				if (WBQueue->head != NULL) {
+					cout << WBQueue->head->instruction[0] << endl;
 					if (WBQueue->head->next != NULL) {
 						WBQueue->first = WBQueue->head->next;
 					}
@@ -293,6 +302,7 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 					}
 					//cout << WBQueue->head->instruction[0] << endl;
 					push(after_WBQueue, WBQueue->head);
+					after_WBQueue->size++;
 					pop(WBQueue);
 					if (WBQueue->head == NULL) {
 						break;
@@ -301,6 +311,8 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 						WBQueue->first = WBQueue->head->next;
 					}
 				}
+
+				
 				
 				//cout << after_WBQueue->tail->instruction[0] << endl;
 			}
