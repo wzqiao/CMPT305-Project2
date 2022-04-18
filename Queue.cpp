@@ -2,6 +2,7 @@
 Node::Node() {
 	this->next = NULL;
 }
+
 Node::Node(string instruction_PC, string instruction_type, string instruction_depends) {
 	/*this->instruction_PC = instruction;
 	this->instruction_type = instruction_type;
@@ -16,6 +17,7 @@ Queue::Queue() {
 	this->head = NULL;
 	this->tail = NULL;
 	this->first = NULL;
+	this->size = 0;
 }
 
 void push(Queue* q, Node* node) {
@@ -24,8 +26,8 @@ void push(Queue* q, Node* node) {
 		q->tail = node;
 	}
 	else {
-		q->tail = node;
-		//q->tail->next = NULL;
+		q->tail->next = node;
+		q->tail = q->tail->next;
 	}
 }
 

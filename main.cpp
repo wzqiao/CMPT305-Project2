@@ -18,7 +18,7 @@
 //using namespace std;
 
 
-bool check_data_dependence(Queue* q,Queue* wbq, Node* node) {
+bool check_data_dependence(Queue* q, Queue* wbq, Node* node) {
 	//遍历IFQueue,检查所需数据是否将要被更改
 	//将要更改就waiting直到更改结束（过WB）
 	//IFQueue一般不会太长 for循环嵌套应该没事
@@ -57,12 +57,12 @@ bool check_data_dependence(Queue* q,Queue* wbq, Node* node) {
 			temp2->first = temp2->head;
 		}
 		//所有数据依赖在IFQueue和过WBQueue里找到
-		if(result == node->instruction.size() - 2) {
+		if (result == node->instruction.size() - 2) {
 			return true;
 		}
 		return false;
 	}
-	
+
 
 	return true;
 }
@@ -332,8 +332,8 @@ int main(int argc, char* argv[]) {
 
 	cout << "start simulation" << endl;
 	simulation(filename, width, start_line, total_line);
+	cout << "end simulation" << endl;
 
-
-	//system("pause");
+	system("pause");
 	return 0;
 }
