@@ -26,6 +26,8 @@ void push(Queue* q, Node* node) {
 		q->tail = node;
 	}
 	else {
+		/*if (q->tail == NULL)
+			q->tail = node;*/
 		q->tail->next = node;
 		q->tail = q->tail->next;
 	}

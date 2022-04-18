@@ -19,28 +19,52 @@
 
 
 bool check_data_dependence(Queue* q, Queue* wbq, Node* node) {
+
+	/*Node* temp_node = wbq->head;
+	while (temp_node != NULL) {
+		cout << temp_node->instruction[0] << endl;
+		temp_node = temp_node->next;
+	}*/
+
+
 	//遍历IFQueue,检查所需数据是否将要被更改
 	//将要更改就waiting直到更改结束（过WB）
 	//IFQueue一般不会太长 for循环嵌套应该没事
-	int result = 0;
+
 	Queue* temp = new Queue();
 	temp = q;
 	Queue* temp2 = new Queue();
 	temp2 = wbq;
 	temp->first = temp->head;
 	temp2->first = temp2->head;
+
 	//size < 2 说明没有数据依赖
+	Node* temp_q = q->head;
+	int result = 0;
 	if (node->instruction.size() > 2) {
 		for (int j = 2; j < node->instruction.size(); j++) {
-			for (int i = 0; i < q->size; i++) {
+
+			/*for (int i = 0; i < q->size; i++) {
 				if (node->instruction[j] == temp->head->instruction[0]) {
 					result++;
 				}
 				temp->first = temp->first->next;
 			}
-			temp->first = temp->head;
+			temp->first = temp->head;*/
+
+
+			while (temp_q != NULL) {
+				if (node->instruction[j] == temp_q->instruction[0]) {
+					result++;
+					break;
+				}
+				temp_q = temp_q->next;
+			}
+
+			temp_q = q->head;
 		}
 
+//		cout << "result: " << result << endl;
 		//所有数据依赖在IFQueue里找到
 		if (result == node->instruction.size() - 2) {
 			return true;
@@ -49,15 +73,27 @@ bool check_data_dependence(Queue* q, Queue* wbq, Node* node) {
 		//如果IFQueue里没有,遍历 过WBQueue    IFQueue里没有 只能从这里找
 	//过WBQueue里储存着曾经完成WB的指令地址
 	//可用多线程搜索
+		Node* temp_wbq = wbq->head;
 		for (int j = 2; j < node->instruction.size(); j++) {
-			for (int i = 0; i < q->size; i++) {
-				if (node->instruction[j] == temp->head->instruction[0]) {
+			/*for (int i = 0; i < wbq->size; i++) {
+				if (node->instruction[j] == temp2->head->instruction[0]) {
 					result++;
 				}
 				temp2->first = temp2->first->next;
 			}
-			temp2->first = temp2->head;
+			temp2->first = temp2->head;*/
+
+			while (temp_wbq != NULL) {
+				if (node->instruction[j] == temp_wbq->instruction[0]) {
+					result++;
+					break;
+				}
+				temp_wbq = temp_wbq->next;
+			}
+			temp_wbq = wbq->head;
 		}
+
+//		cout << "result: " << result << endl;
 		//所有数据依赖在IFQueue和过WBQueue里找到
 		if (result == node->instruction.size() - 2) {
 			return true;
@@ -92,7 +128,7 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 	Queue* after_WBQueue = new Queue();
 
 
-	int circles = 0;
+	
 	ifstream infile;
 	infile.open(file_name, ifstream::in);
 	if (infile.is_open()) {
@@ -109,9 +145,11 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 		while (line_count < total_simulate_lines)
 		{
 			//line_count == 0 说明已经开始操作了，外面这个getline会导致多读一行
-			if (line_count == 0) {
-				getline(infile, content);
-				current_line_infile++;
+			if (start_line != 0) {
+				if (line_count == 0) {
+					getline(infile, content);
+					current_line_infile++;
+				}
 			}
 			//cout << 1 << endl;
 			//cout << "current line in file: " << current_line_infile << endl;
@@ -137,19 +175,39 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 							temp->instruction.push_back(token);
 						}
 						push_back(IFQueue, temp);
+
 						/*if (temp->instruction[1] == "3") {
 							stop_tag_branch = true;
 						}*/
+
+						switch (stoi(temp->instruction[1])) {
+						case 1:
+							type_count[0]++;
+							break;
+						case 2:
+							type_count[1]++;
+							break;
+						case 3:
+							type_count[2]++;
+							break;
+						case 4:
+							type_count[3]++;
+							break;
+						case 5:
+							type_count[4]++;
+							break;
+						}
+
 						IFQueue->size++;
 						line_count++;
 						current_line_infile++;
 
 					}
 				}
-				cout << "after_WBQueue->size: " << after_WBQueue->size << endl;
+//				cout << "after_WBQueue->size: " << after_WBQueue->size << endl;
 				cout << "current line in file: " << current_line_infile << endl;
-				cout << IFQueue->head->instruction[0] << endl; //ffff000008082890,3,ffff00000808288c
-				//cout << stop_tag_branch << endl; 0, false
+//				cout << "IF: " << IFQueue->head->instruction[0] << endl; //ffff000008082890,3,ffff00000808288c
+//				//cout << stop_tag_branch << endl; 0, false
 				//cout << "IFQueue->size: " << IFQueue->size << endl;
 
 
@@ -179,14 +237,14 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 				}
 				IDQueue->first = IDQueue->head;
 
-				cout << IDQueue->head->instruction[0] << endl;
+				cout << "ID: " << IDQueue->head->instruction[0] << endl;
 				//ID 阶段 指令解码和读取操作数 
 				// An instruction cannot go to EX until all its data dependences are satisfied
 				//一条指令在满足其所有数据相关性之前不能进入 EX
 				
 				//检查是否满足数据相关性
 				for (int i = 0; i < width; i++) {
-					is_satisfied = check_data_dependence(IDQueue, WBQueue, IDQueue->first);
+					is_satisfied = check_data_dependence(IDQueue, after_WBQueue, IDQueue->first);
 					//满足数据相关性后
 					if (is_satisfied) {
 						//ID to EX 
@@ -209,7 +267,7 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 				//stop_tag_branch在过EX后变为false
 				
 				if (EXQueue->head != NULL) {
-					cout << EXQueue->head->instruction[0] << endl;
+					cout << "EX: " << EXQueue->head->instruction[0] << endl;
 					if (EXQueue->head->next != NULL) {
 						EXQueue->first = EXQueue->head->next;
 					}
@@ -252,7 +310,7 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 				//cout << "1111111" << endl;
 				//MEM
 				if (MEMQueue->head != NULL) {
-					cout << MEMQueue->head->instruction[0] << endl;
+//					cout << "MEM: " << MEMQueue->head->instruction[0] << endl;
 					if (MEMQueue->head->next != NULL) {
 						MEMQueue->first = MEMQueue->head->next;
 					}
@@ -283,7 +341,7 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 				
 				//WB
 				if (WBQueue->head != NULL) {
-					cout << WBQueue->head->instruction[0] << endl;
+//					cout << "WB: " << WBQueue->head->instruction[0] << endl << endl;
 					if (WBQueue->head->next != NULL) {
 						WBQueue->first = WBQueue->head->next;
 					}
@@ -320,8 +378,8 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 		}
 		//cout << IFQueue->head->instruction[1] << endl;
 		//cout << IFQueue->head->next->instruction[1] << endl;
-		cout << "line count: " << line_count << endl;
-		cout << "Total line: " << total_simulate_lines << endl;
+//		cout << "line count: " << line_count << endl;
+//		cout << "Total line: " << total_simulate_lines << endl;
 		cout << circles << endl;
 		/*for (auto line : vStr)
 		{
@@ -337,13 +395,19 @@ int main(int argc, char* argv[]) {
 	string filename = "srv_0";
 	//string filename = "test.txt";
 
-	int width = 1;
-	int start_line = 0;
-	int total_line = 30;
+	int width = 2;
+	int start_line = 1;
+	int total_line = 1000;
 
 
 	cout << "start simulation" << endl;
 	simulation(filename, width, start_line, total_line);
+
+
+	for (int i = 0; i < 5; i++)
+		cout << (double)type_count[i] / circles << endl;
+
+
 	cout << "end simulation" << endl;
 
 	system("pause");

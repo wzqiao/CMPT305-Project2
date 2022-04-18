@@ -7,3 +7,5 @@ extern int branch_execution_unit;
 extern int is_reading;
 extern int is_writing;
 
+extern int circles;
+extern int type_count[5];

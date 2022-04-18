@@ -1,10 +1,15 @@
 #include "CPU.h"
 #include "all_global_values.h"
+
 int integer_ALU;
 int floating_point_unit;
 int branch_execution_unit;
 int is_reading;
 int is_writing;
+
+int circles = 0;
+int type_count[5] = { 0,0,0,0,0 };
+
 void use_integer_ALU()
 {
 	//0 is free, 1 is using
