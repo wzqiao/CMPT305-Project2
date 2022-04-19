@@ -25,6 +25,9 @@ void push(Queue* q, Node* node) {
 		q->head = node;
 		q->tail = node;
 	}
+	if (q->tail == NULL) {
+		q->tail = node;
+	}
 	else {
 		/*if (q->tail == NULL)
 			q->tail = node;*/
@@ -37,6 +40,9 @@ void push_back(Queue* q, Node* node) {
 	if (q->head == NULL) {
 		//queue is empty
 		q->head = node;
+		q->tail = node;
+	}
+	if (q->tail == NULL) {
 		q->tail = node;
 	}
 	else {
