@@ -18,7 +18,16 @@
 #include <vector>
 #include <sstream>
 //using namespace std;
+int current_line_infile = 0;
+int line_count = 0;
+int index = 0;
+bool stop_tag_branch = false; //true is stop instruction fetch. false do nothing
+bool is_satisfied = false;
 
+int width;
+int start_line;
+int total_simulate_lines;
+string file_name;
 void remove(queue<Node*>& q, Node* node)
 {
 	if (q.empty()) {
@@ -164,6 +173,301 @@ bool check_data_dependence(queue<Node*> q, queue<Node*> after_wbq, Node* node) {
 	return true;
 }
 
+void IF_stage(ifstream& infile,queue<Node*> IFQueue) {
+	string content;
+	//line_count == 0 说明已经开始操作了，外面这个getline会导致多读一行
+	if (start_line != 0) {
+		if (line_count == 0) {
+			getline(infile, content);
+			current_line_infile++;
+		}
+	}
+	//cout << 1 << endl;
+	//cout << "current line in file: " << current_line_infile << endl;
+	//start push instruction into pipeline
+
+	if (current_line_infile >= start_line && line_count < total_simulate_lines) {
+		if (!stop_tag_branch) {
+			//cout << 2 << endl;
+			//创建w个node， 一次读取w个指令
+			for (int i = 0; i < width; i++) {
+				getline(infile, content);
+				//vStr.push_back(content);
+
+				//cout << "content: " << content << endl;
+				//cout << ++index << endl;
+				//分割字符串
+				stringstream sstr(content);
+				string token;
+				Node* temp = new Node();
+				while (getline(sstr, token, ',')) {
+					//cout << token << endl;
+					//IF 阶段 指令获取
+
+					temp->instruction.push_back(token);
+				}
+				IFQueue.push(temp);
+
+				/*if (temp->instruction[1] == "3") {
+					stop_tag_branch = true;
+				}*/
+
+
+				switch (stoi(temp->instruction[1])) {
+
+				case 1:
+					type_count[0]++;
+					break;
+				case 2:
+					type_count[1]++;
+					break;
+				case 3:
+					type_count[2]++;
+					break;
+				case 4:
+					type_count[3]++;
+					break;
+				case 5:
+					type_count[4]++;
+					break;
+				}
+
+				//						IFQueue->size++;
+				line_count++;
+				current_line_infile++;
+
+			}
+		}
+		//				cout << "after_WBQueue->size: " << after_WBQueue->size << endl;
+		//				cout << "current line in file: " << current_line_infile << endl;
+		//				cout << "IF: " << IFQueue->head->instruction[0] << endl; //ffff000008082890,3,ffff00000808288c
+		//				//cout << stop_tag_branch << endl; 0, false
+						//cout << "IFQueue->size: " << IFQueue->size << endl;
+		circles++;
+	}
+}
+
+void IF_to_ID_stage(ifstream& infile, queue<Node*> IFQueue, queue<Node*> IDQueue) {
+	Node* first_IF = NULL;
+	if (!IFQueue.empty())
+		first_IF = IFQueue.front();
+
+
+	//IF to ID
+	for (int i = 0; i < width; i++) {
+		//					cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!: " << i << endl;
+
+							//如果指令是分支指令停止IF指令的获取直到该指令过EX
+							//有分支指令 不停止IF to ID? 停止IF 停止其他指令ID to EX 等该指令通过EX
+							/*if (IFQueue->head == NULL) {
+								push(IDQueue, IFQueue->first);
+								pop(IFQueue);
+							}*/
+							//普通指令进入ID
+		if (IDQueue.empty())
+			break;
+
+		if (first_IF != NULL) {
+			if (first_IF->instruction[1] == "3") {
+				stop_tag_branch = true;
+				IDQueue.push(IFQueue.front());
+				//pop(IFQueue);
+				remove(IFQueue, first_IF);
+				break;
+			}
+		}
+		if (!IDQueue.empty()) {
+			Node* temp = new Node();
+			temp = IDQueue.front();
+			while (temp->next != NULL) {
+				//							cout << "IDQueue instruction@@@@@@@" << temp->instruction[0] << endl;
+				//							cout << "IDQueue instruction next" << temp->next->instruction[0] << endl;
+				temp = temp->next;
+
+			}
+		}
+		IDQueue.push(IFQueue.front());
+		IFQueue.pop();
+
+	}
+}
+
+void ID_stage(ifstream& infile, queue<Node*> IFQueue, queue<Node*> IDQueue, queue<Node*>EXQueue,queue<Node*> after_WBQueue) {
+	IF_stage(infile, IFQueue);
+	Node* first_ID = NULL;
+	if (!IDQueue.empty())
+		first_ID = IDQueue.front();
+
+	//检查是否满足数据相关性
+	for (int i = 0; i < width; i++) {
+
+		if (IDQueue.empty()) {
+			break;
+		}
+
+		//cout << "IDQueue first instruction: " << IDQueue->first->instruction[0] << endl;
+		is_satisfied = check_data_dependence(IDQueue, after_WBQueue, first_ID);
+
+		//满足数据相关性后
+		if (is_satisfied) {
+			//						cout << "is_satisfied2: " << is_satisfied << endl;
+									//ID to EX 
+									// 
+									//这里少判断条件?
+									//cout << IDQueue->head->instruction[0] << endl;
+			//						cout << "IDQueue first instruction3: " << IDQueue->first->instruction[0] << endl;
+			EXQueue.push(first_ID);
+			//pop(IDQueue);
+			remove(IDQueue, first_ID);
+		}
+		if (first_ID->next != NULL) {
+			first_ID = first_ID->next;
+		}
+	}
+	//circles++;
+}
+
+void EX_stage(ifstream& infile, queue<Node*> IFQueue, queue<Node*> IDQueue, queue<Node*>EXQueue, queue<Node*> MEMQueue,queue<Node*> after_WBQueue) {
+	IF_stage(infile, IFQueue);
+	IF_to_ID_stage(infile, IFQueue, IDQueue);
+	ID_stage(infile, IFQueue, IDQueue, EXQueue, after_WBQueue);
+	Node* first_EX = NULL;
+	if (!EXQueue.empty()) {
+		//					cout << "EX: " << EXQueue->head->instruction[0] << endl;
+		if (EXQueue.front()->next != NULL) {
+			first_EX = EXQueue.front()->next;
+		}
+	}
+
+	for (int i = 0; i < width; i++) {
+
+		if (!EXQueue.empty()) {
+			if (EXQueue.front()->instruction[1] == "3") {
+				MEMQueue.push(EXQueue.front());
+				EXQueue.pop();
+				circles++;
+				cout << "1111111111" << endl;
+				stop_tag_branch = false;
+				break;
+			}
+
+
+			if (first_EX == NULL) {
+				break;
+			}
+
+			//同时用一个功能单元
+			if (first_EX != NULL) {
+				if (EXQueue.front()->instruction[1] == first_EX->instruction[1]) {
+					MEMQueue.push(EXQueue.front());
+					EXQueue.pop();
+					circles++;
+					break;
+				}
+			}
+		}
+		if (EXQueue.empty()) {
+			break;
+		}
+		//不共用一个功能单元，正常输出
+		MEMQueue.push(EXQueue.front());
+		EXQueue.pop();
+
+		if (EXQueue.empty()) {
+			break;
+		}
+
+		if (EXQueue.front()->next != NULL) {
+			first_EX = EXQueue.front()->next;
+		}
+
+	}
+
+	//circles++;
+}
+
+void MEM_stage(ifstream& infile, queue<Node*> IFQueue, queue<Node*> IDQueue, queue<Node*>EXQueue, queue<Node*> MEMQueue,queue<Node*> WBQueue ,queue<Node*> after_WBQueue) {
+	IF_stage(infile, IFQueue);
+	IF_to_ID_stage(infile, IFQueue, IDQueue);
+	ID_stage(infile, IFQueue, IDQueue, EXQueue, after_WBQueue);
+	EX_stage(infile, IFQueue, IDQueue, EXQueue, MEMQueue, after_WBQueue);
+	Node* first_MEM = NULL;
+	//MEM
+	if (!MEMQueue.empty()) {
+		//					cout << "MEM: " << MEMQueue->head->instruction[0] << endl;
+		if (MEMQueue.front()->next != NULL) {
+			first_MEM = MEMQueue.front()->next;
+		}
+	}
+	for (int i = 0; i < width; i++) {
+		//同时用一个功能单元
+		if (first_MEM != NULL) {
+			if (MEMQueue.front()->instruction[1] == first_MEM->instruction[1]) {
+				WBQueue.push(MEMQueue.front());
+				MEMQueue.pop();
+				circles++;
+				break;
+			}
+		}
+		if (MEMQueue.empty()) {
+			break;
+		}
+		WBQueue.push(MEMQueue.front());
+		MEMQueue.pop();
+		if (MEMQueue.empty()) {
+			break;
+		}
+		if (MEMQueue.front()->next != NULL) {
+			first_MEM = MEMQueue.front()->next;
+		}
+	}
+	circles++;
+}
+
+void WB_stage(ifstream& infile, queue<Node*> IFQueue, queue<Node*> IDQueue, queue<Node*>EXQueue, queue<Node*> MEMQueue, queue<Node*> WBQueue, queue<Node*> after_WBQueue) {
+	IF_stage(infile, IFQueue);
+	IF_to_ID_stage(infile, IFQueue, IDQueue);
+	ID_stage(infile, IFQueue, IDQueue, EXQueue, after_WBQueue);
+	EX_stage(infile, IFQueue, IDQueue, EXQueue, MEMQueue, after_WBQueue);
+	MEM_stage(infile, IFQueue, IDQueue, EXQueue, MEMQueue, WBQueue, after_WBQueue);
+	Node* first_WB = NULL;
+	//WB
+	if (!WBQueue.empty()) {
+		//					cout << "WB: " << WBQueue->head->instruction[0] << endl << endl;
+		if (WBQueue.front()->next != NULL) {
+			first_WB = WBQueue.front()->next;
+		}
+	}
+	for (int i = 0; i < width; i++) {
+		//同时用一个功能单元
+		if (first_WB != NULL) {
+			if (WBQueue.front()->instruction[1] == first_WB->instruction[1]) {
+				after_WBQueue.push(WBQueue.front());
+				WBQueue.pop();
+				//cout << "1111111111" << endl;
+				circles++;
+				break;
+			}
+		}
+		if (WBQueue.empty()) {
+			break;
+		}
+		//cout << WBQueue->head->instruction[0] << endl;
+		after_WBQueue.push(WBQueue.front());
+		//					after_WBQueue->size++;
+
+		WBQueue.pop();
+		if (WBQueue.empty()) {
+			break;
+		}
+
+		if (WBQueue.front()->next != NULL) {
+			first_WB = WBQueue.front()->next;
+		}
+	}
+	circles++;
+}
+
 void simulation(string file_name, int width, int start_line, int total_simulate_lines) {
 	
 	//ifstream read_file(file_name);
@@ -200,292 +504,288 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 	infile.open(file_name, ifstream::in);
 	if (infile.is_open()) {
 		//vector<string> vStr;
-		string content;
+		
 		
 		//
 		start_line--;
-		int current_line_infile = 0;
-		int line_count = 0;
-		int index = 0;
-		bool stop_tag_branch = false; //true is stop instruction fetch. false do nothing
-		bool is_satisfied = false;
+		
 		while (line_count < total_simulate_lines)
 		{
-			//line_count == 0 说明已经开始操作了，外面这个getline会导致多读一行
-			if (start_line != 0) {
-				if (line_count == 0) {
-					getline(infile, content);
-					current_line_infile++;
-				}
-			}
-			//cout << 1 << endl;
-			//cout << "current line in file: " << current_line_infile << endl;
-			//start push instruction into pipeline
+			IF_stage(infile, IFQueue);
+//			//line_count == 0 说明已经开始操作了，外面这个getline会导致多读一行
+//			if (start_line != 0) {
+//				if (line_count == 0) {
+//					getline(infile, content);
+//					current_line_infile++;
+//				}
+//			}
+//			//cout << 1 << endl;
+//			//cout << "current line in file: " << current_line_infile << endl;
+//			//start push instruction into pipeline
+//
+//			if (current_line_infile >= start_line && line_count < total_simulate_lines) {
+//				if (!stop_tag_branch) {
+//					//cout << 2 << endl;
+//					//创建w个node， 一次读取w个指令
+//					for (int i = 0; i < width; i++) {
+//						getline(infile, content);
+//						//vStr.push_back(content);
+//
+//						//cout << "content: " << content << endl;
+//						//cout << ++index << endl;
+//						//分割字符串
+//						stringstream sstr(content);
+//						string token;
+//						Node* temp = new Node();
+//						while (getline(sstr, token, ',')) {
+//							//cout << token << endl;
+//							//IF 阶段 指令获取
+//
+//							temp->instruction.push_back(token);
+//						}
+//						IFQueue.push(temp);
+//
+//						/*if (temp->instruction[1] == "3") {
+//							stop_tag_branch = true;
+//						}*/
+//
+//						
+//						switch (stoi(temp->instruction[1])) {
+//
+//						case 1:
+//							type_count[0]++;
+//							break;
+//						case 2:
+//							type_count[1]++;
+//							break;
+//						case 3:
+//							type_count[2]++;
+//							break;
+//						case 4:
+//							type_count[3]++;
+//							break;
+//						case 5:
+//							type_count[4]++;
+//							break;
+//						}
+//
+////						IFQueue->size++;
+//						line_count++;
+//						current_line_infile++;
+//
+//					}
+//				}
+////				cout << "after_WBQueue->size: " << after_WBQueue->size << endl;
+////				cout << "current line in file: " << current_line_infile << endl;
+////				cout << "IF: " << IFQueue->head->instruction[0] << endl; //ffff000008082890,3,ffff00000808288c
+////				//cout << stop_tag_branch << endl; 0, false
+//				//cout << "IFQueue->size: " << IFQueue->size << endl;
+//				circles++;
 
-			if (current_line_infile >= start_line && line_count < total_simulate_lines) {
-				if (!stop_tag_branch) {
-					//cout << 2 << endl;
-					//创建w个node， 一次读取w个指令
-					for (int i = 0; i < width; i++) {
-						getline(infile, content);
-						//vStr.push_back(content);
-
-						//cout << "content: " << content << endl;
-						//cout << ++index << endl;
-						//分割字符串
-						stringstream sstr(content);
-						string token;
-						Node* temp = new Node();
-						while (getline(sstr, token, ',')) {
-							//cout << token << endl;
-							//IF 阶段 指令获取
-
-							temp->instruction.push_back(token);
-						}
-						IFQueue.push(temp);
-
-						/*if (temp->instruction[1] == "3") {
-							stop_tag_branch = true;
-						}*/
-
-						
-						switch (stoi(temp->instruction[1])) {
-
-						case 1:
-							type_count[0]++;
-							break;
-						case 2:
-							type_count[1]++;
-							break;
-						case 3:
-							type_count[2]++;
-							break;
-						case 4:
-							type_count[3]++;
-							break;
-						case 5:
-							type_count[4]++;
-							break;
-						}
-
-//						IFQueue->size++;
-						line_count++;
-						current_line_infile++;
-
-					}
-				}
-//				cout << "after_WBQueue->size: " << after_WBQueue->size << endl;
-//				cout << "current line in file: " << current_line_infile << endl;
-//				cout << "IF: " << IFQueue->head->instruction[0] << endl; //ffff000008082890,3,ffff00000808288c
-//				//cout << stop_tag_branch << endl; 0, false
-				//cout << "IFQueue->size: " << IFQueue->size << endl;
-				circles++;
-
-				Node* first_IF = NULL;
-				if(!IFQueue.empty())
-					first_IF = IFQueue.front();
-
-
-				//IF to ID
-				for (int i = 0; i < width; i++) {
-//					cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!: " << i << endl;
-
-					//如果指令是分支指令停止IF指令的获取直到该指令过EX
-					//有分支指令 不停止IF to ID? 停止IF 停止其他指令ID to EX 等该指令通过EX
-					/*if (IFQueue->head == NULL) {
-						push(IDQueue, IFQueue->first);
-						pop(IFQueue);
-					}*/
-					//普通指令进入ID
-					if (IDQueue.empty())
-						break;
-					
-					if (first_IF != NULL) {
-						if (first_IF->instruction[1] == "3") {
-							stop_tag_branch = true;
-							IDQueue.push(IFQueue.front());
-							//pop(IFQueue);
-							remove(IFQueue, first_IF);
-							break;
-						}
-					}
-					if (!IDQueue.empty()) {
-						Node* temp = new Node();
-						temp = IDQueue.front();
-						while (temp->next != NULL) {
-//							cout << "IDQueue instruction@@@@@@@" << temp->instruction[0] << endl;
-//							cout << "IDQueue instruction next" << temp->next->instruction[0] << endl;
-							temp = temp->next;
-							
-						}
-					}
-					IDQueue.push(IFQueue.front());
-					IFQueue.pop();
-
-				}
-				
-
-
+//				Node* first_IF = NULL;
+//				if(!IFQueue.empty())
+//					first_IF = IFQueue.front();
+//
+//
+//				//IF to ID
+//				for (int i = 0; i < width; i++) {
+////					cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!: " << i << endl;
+//
+//					//如果指令是分支指令停止IF指令的获取直到该指令过EX
+//					//有分支指令 不停止IF to ID? 停止IF 停止其他指令ID to EX 等该指令通过EX
+//					/*if (IFQueue->head == NULL) {
+//						push(IDQueue, IFQueue->first);
+//						pop(IFQueue);
+//					}*/
+//					//普通指令进入ID
+//					if (IDQueue.empty())
+//						break;
+//					
+//					if (first_IF != NULL) {
+//						if (first_IF->instruction[1] == "3") {
+//							stop_tag_branch = true;
+//							IDQueue.push(IFQueue.front());
+//							//pop(IFQueue);
+//							remove(IFQueue, first_IF);
+//							break;
+//						}
+//					}
+//					if (!IDQueue.empty()) {
+//						Node* temp = new Node();
+//						temp = IDQueue.front();
+//						while (temp->next != NULL) {
+////							cout << "IDQueue instruction@@@@@@@" << temp->instruction[0] << endl;
+////							cout << "IDQueue instruction next" << temp->next->instruction[0] << endl;
+//							temp = temp->next;
+//							
+//						}
+//					}
+//					IDQueue.push(IFQueue.front());
+//					IFQueue.pop();
+//
+//				}
+			IF_to_ID_stage(infile, IFQueue, IDQueue);
 //				cout << "ID: " << IDQueue->head->instruction[0] << endl;
 				//ID 阶段 指令解码和读取操作数 
 				// An instruction cannot go to EX until all its data dependences are satisfied
 				//一条指令在满足其所有数据相关性之前不能进入 EX
 				
-				Node* first_ID = NULL;
-				if(!IDQueue.empty())
-					first_ID = IDQueue.front();
-
-				//检查是否满足数据相关性
-				for (int i = 0; i < width; i++) {
-
-					if (IDQueue.empty()) {
-						break;
-					}
-
-					//cout << "IDQueue first instruction: " << IDQueue->first->instruction[0] << endl;
-					is_satisfied = check_data_dependence(IDQueue, after_WBQueue, first_ID);
-					
-					//满足数据相关性后
-					if (is_satisfied) {
-//						cout << "is_satisfied2: " << is_satisfied << endl;
-						//ID to EX 
-						// 
-						//这里少判断条件?
-						//cout << IDQueue->head->instruction[0] << endl;
-//						cout << "IDQueue first instruction3: " << IDQueue->first->instruction[0] << endl;
-						EXQueue.push(first_ID);
-						//pop(IDQueue);
-						remove(IDQueue, first_ID);
-					}
-					if (first_ID->next != NULL) {
-						first_ID = first_ID->next;
-					}
-				}
-				circles++;
-				
+//				Node* first_ID = NULL;
+//				if(!IDQueue.empty())
+//					first_ID = IDQueue.front();
+//
+//				//检查是否满足数据相关性
+//				for (int i = 0; i < width; i++) {
+//
+//					if (IDQueue.empty()) {
+//						break;
+//					}
+//
+//					//cout << "IDQueue first instruction: " << IDQueue->first->instruction[0] << endl;
+//					is_satisfied = check_data_dependence(IDQueue, after_WBQueue, first_ID);
+//					
+//					//满足数据相关性后
+//					if (is_satisfied) {
+////						cout << "is_satisfied2: " << is_satisfied << endl;
+//						//ID to EX 
+//						// 
+//						//这里少判断条件?
+//						//cout << IDQueue->head->instruction[0] << endl;
+////						cout << "IDQueue first instruction3: " << IDQueue->first->instruction[0] << endl;
+//						EXQueue.push(first_ID);
+//						//pop(IDQueue);
+//						remove(IDQueue, first_ID);
+//					}
+//					if (first_ID->next != NULL) {
+//						first_ID = first_ID->next;
+//					}
+//				}
+//				circles++;
+			ID_stage(infile, IFQueue, IDQueue, EXQueue, after_WBQueue);
 				//只有一个整数ALU的话，好像不管w是多少第一个使用整数ALU的指令push进EXQueue
 				// 都会使后面的使用整数ALU的指令等待
 				//EX 阶段指令发出和执行
 				//stop_tag_branch在过EX后变为false
-				Node* first_EX = NULL;
-				if (!EXQueue.empty()) {
-//					cout << "EX: " << EXQueue->head->instruction[0] << endl;
-					if (EXQueue.front()->next != NULL) {
-						first_EX = EXQueue.front()->next;
-					}
-				}
-
-				for (int i = 0; i < width; i++) {
-
-					if (!EXQueue.empty()) {
-						if (EXQueue.front()->instruction[1] == "3") {
-							MEMQueue.push(EXQueue.front());
-							EXQueue.pop();
-							stop_tag_branch = false;
-							break;
-						}
-
-
-						if (first_EX == NULL) {
-							break;
-						}
-
-						//同时用一个功能单元
-						if (first_EX != NULL) {
-							if (EXQueue.front()->instruction[1] == first_EX->instruction[1]) {
-								MEMQueue.push(EXQueue.front());
-								EXQueue.pop();
-								break;
-							}
-						}
-					}
-					if (EXQueue.empty()) {
-						break;
-					}
-					//不共用一个功能单元，正常输出
-					MEMQueue.push(EXQueue.front());
-					EXQueue.pop();
-
-					if (EXQueue.empty()) {
-						break;
-					}
-
-					if (EXQueue.front()->next != NULL) {
-						first_EX = EXQueue.front()->next;
-					}
-					
-				}
-
-				circles++;
+//				Node* first_EX = NULL;
+//				if (!EXQueue.empty()) {
+////					cout << "EX: " << EXQueue->head->instruction[0] << endl;
+//					if (EXQueue.front()->next != NULL) {
+//						first_EX = EXQueue.front()->next;
+//					}
+//				}
+//
+//				for (int i = 0; i < width; i++) {
+//
+//					if (!EXQueue.empty()) {
+//						if (EXQueue.front()->instruction[1] == "3") {
+//							MEMQueue.push(EXQueue.front());
+//							EXQueue.pop();
+//							stop_tag_branch = false;
+//							break;
+//						}
+//
+//
+//						if (first_EX == NULL) {
+//							break;
+//						}
+//
+//						//同时用一个功能单元
+//						if (first_EX != NULL) {
+//							if (EXQueue.front()->instruction[1] == first_EX->instruction[1]) {
+//								MEMQueue.push(EXQueue.front());
+//								EXQueue.pop();
+//								break;
+//							}
+//						}
+//					}
+//					if (EXQueue.empty()) {
+//						break;
+//					}
+//					//不共用一个功能单元，正常输出
+//					MEMQueue.push(EXQueue.front());
+//					EXQueue.pop();
+//
+//					if (EXQueue.empty()) {
+//						break;
+//					}
+//
+//					if (EXQueue.front()->next != NULL) {
+//						first_EX = EXQueue.front()->next;
+//					}
+//					
+//				}
+//
+//				circles++;
+			
+			EX_stage(infile, IFQueue, IDQueue, EXQueue, MEMQueue, after_WBQueue);
+//				Node* first_MEM = NULL;
+//				//MEM
+//				if (!MEMQueue.empty()) {
+////					cout << "MEM: " << MEMQueue->head->instruction[0] << endl;
+//					if (MEMQueue.front()->next != NULL) {
+//						first_MEM = MEMQueue.front()->next;
+//					}
+//				}
+//				for (int i = 0; i < width; i++) {
+//					//同时用一个功能单元
+//					if (first_MEM != NULL) {
+//						if (MEMQueue.front()->instruction[1] == first_MEM->instruction[1]) {
+//							WBQueue.push(MEMQueue.front());
+//							MEMQueue.pop();
+//							break;
+//						}
+//					}
+//					if (MEMQueue.empty()) {
+//						break;
+//					}
+//					WBQueue.push(MEMQueue.front());
+//					MEMQueue.pop();
+//					if (MEMQueue.empty()) {
+//						break;
+//					}
+//					if (MEMQueue.front()->next != NULL) {
+//						first_MEM = MEMQueue.front()->next;
+//					}
+//				}
+//				circles++;
 				
-				Node* first_MEM = NULL;
-				//MEM
-				if (!MEMQueue.empty()) {
-//					cout << "MEM: " << MEMQueue->head->instruction[0] << endl;
-					if (MEMQueue.front()->next != NULL) {
-						first_MEM = MEMQueue.front()->next;
-					}
-				}
-				for (int i = 0; i < width; i++) {
-					//同时用一个功能单元
-					if (first_MEM != NULL) {
-						if (MEMQueue.front()->instruction[1] == first_MEM->instruction[1]) {
-							WBQueue.push(MEMQueue.front());
-							MEMQueue.pop();
-							break;
-						}
-					}
-					if (MEMQueue.empty()) {
-						break;
-					}
-					WBQueue.push(MEMQueue.front());
-					MEMQueue.pop();
-					if (MEMQueue.empty()) {
-						break;
-					}
-					if (MEMQueue.front()->next != NULL) {
-						first_MEM = MEMQueue.front()->next;
-					}
-				}
-				circles++;
+			MEM_stage(infile, IFQueue, IDQueue, EXQueue, MEMQueue, WBQueue, after_WBQueue);
+//				Node* first_WB = NULL;
+//				//WB
+//				if (!WBQueue.empty()) {
+////					cout << "WB: " << WBQueue->head->instruction[0] << endl << endl;
+//					if (WBQueue.front()->next != NULL) {
+//						first_WB = WBQueue.front()->next;
+//					}
+//				}
+//				for (int i = 0; i < width; i++) {
+//					//同时用一个功能单元
+//					if (first_WB != NULL) {
+//						if (WBQueue.front()->instruction[1] == first_WB->instruction[1]) {
+//							after_WBQueue.push(WBQueue.front());
+//							WBQueue.pop();
+//							break;
+//						}
+//					}
+//					if (WBQueue.empty()) {
+//						break;
+//					}
+//					//cout << WBQueue->head->instruction[0] << endl;
+//					after_WBQueue.push(WBQueue.front());
+////					after_WBQueue->size++;
+//
+//					WBQueue.pop();
+//					if (WBQueue.empty()) {
+//						break;
+//					}
+//
+//					if (WBQueue.front()->next != NULL) {
+//						first_WB = WBQueue.front()->next;
+//					}
+//				}
+//				circles++;
 				
-				
-				Node* first_WB = NULL;
-				//WB
-				if (!WBQueue.empty()) {
-//					cout << "WB: " << WBQueue->head->instruction[0] << endl << endl;
-					if (WBQueue.front()->next != NULL) {
-						first_WB = WBQueue.front()->next;
-					}
-				}
-				for (int i = 0; i < width; i++) {
-					//同时用一个功能单元
-					if (first_WB != NULL) {
-						if (WBQueue.front()->instruction[1] == first_WB->instruction[1]) {
-							after_WBQueue.push(WBQueue.front());
-							WBQueue.pop();
-							break;
-						}
-					}
-					if (WBQueue.empty()) {
-						break;
-					}
-					//cout << WBQueue->head->instruction[0] << endl;
-					after_WBQueue.push(WBQueue.front());
-//					after_WBQueue->size++;
-
-					WBQueue.pop();
-					if (WBQueue.empty()) {
-						break;
-					}
-
-					if (WBQueue.front()->next != NULL) {
-						first_WB = WBQueue.front()->next;
-					}
-				}
-				circles++;
-				
-				
+			WB_stage(infile, IFQueue, IDQueue, EXQueue, MEMQueue, WBQueue, after_WBQueue);
 				//cout << after_WBQueue->tail->instruction[0] << endl;
 			}
 			
@@ -499,26 +799,26 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 		{
 			cout << line << endl;
 		}*/
-	}
+	
 	infile.close();
 
 
 }
 
 int main(int argc, char* argv[]) {
-	string filename = "compute_int_0";
+	file_name = "compute_int_0";
 
-	int width = 2;
-	int start_line = 1;
-	int total_line = 1000000;
+	width = 2;
+	start_line = 1;
+	total_simulate_lines = 1000000;
 
 
 	cout << "start simulation" << endl;
-	simulation(filename, width, start_line, total_line);
+	simulation(file_name, width, start_line, total_simulate_lines);
 
 
 	for (int i = 0; i < 5; i++)
-		cout << (double)type_count[i] / total_line << endl;
+		cout << (double)type_count[i] / total_simulate_lines << endl;
 
 
 	cout << "end simulation" << endl;
