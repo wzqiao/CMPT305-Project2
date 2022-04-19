@@ -77,7 +77,7 @@ void remove(queue<Node*>& q, Node* node)
 	}
 }
 
-bool check_data_dependence(queue<Node*> q, queue<Node*> after_wbq, Node* node) {
+bool check_data_dependence(queue<Node*>& q, queue<Node*>& after_wbq, Node* node) {
 
 	/*Node* temp_node = wbq->head;
 	while (temp_node != NULL) {
@@ -173,7 +173,7 @@ bool check_data_dependence(queue<Node*> q, queue<Node*> after_wbq, Node* node) {
 	return true;
 }
 
-void IF_stage(ifstream& infile,queue<Node*> IFQueue) {
+void IF_stage(ifstream& infile,queue<Node*> &IFQueue) {
 	string content;
 	//line_count == 0 说明已经开始操作了，外面这个getline会导致多读一行
 	if (start_line != 0) {
@@ -207,7 +207,7 @@ void IF_stage(ifstream& infile,queue<Node*> IFQueue) {
 					temp->instruction.push_back(token);
 				}
 				IFQueue.push(temp);
-
+				//cout << IFQueue.size() << endl;
 				/*if (temp->instruction[1] == "3") {
 					stop_tag_branch = true;
 				}*/
@@ -247,8 +247,10 @@ void IF_stage(ifstream& infile,queue<Node*> IFQueue) {
 	}
 }
 
-void IF_to_ID_stage(ifstream& infile, queue<Node*> IFQueue, queue<Node*> IDQueue) {
+void IF_to_ID_stage(ifstream& infile, queue<Node*>& IFQueue, queue<Node*>& IDQueue) {
 	Node* first_IF = NULL;
+	//cout << "IFQueue.size(): " << IFQueue.size() << endl;
+	
 	if (!IFQueue.empty())
 		first_IF = IFQueue.front();
 
@@ -257,15 +259,14 @@ void IF_to_ID_stage(ifstream& infile, queue<Node*> IFQueue, queue<Node*> IDQueue
 	for (int i = 0; i < width; i++) {
 		//					cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!: " << i << endl;
 
-							//如果指令是分支指令停止IF指令的获取直到该指令过EX
-							//有分支指令 不停止IF to ID? 停止IF 停止其他指令ID to EX 等该指令通过EX
-							/*if (IFQueue->head == NULL) {
-								push(IDQueue, IFQueue->first);
-								pop(IFQueue);
-							}*/
-							//普通指令进入ID
-		if (IDQueue.empty())
-			break;
+		//如果指令是分支指令停止IF指令的获取直到该指令过EX
+		//有分支指令 不停止IF to ID? 停止IF 停止其他指令ID to EX 等该指令通过EX
+		/*if (IFQueue->head == NULL) {
+			push(IDQueue, IFQueue->first);
+			pop(IFQueue);
+		}*/
+		//普通指令进入ID
+		
 
 		if (first_IF != NULL) {
 			if (first_IF->instruction[1] == "3") {
@@ -286,13 +287,15 @@ void IF_to_ID_stage(ifstream& infile, queue<Node*> IFQueue, queue<Node*> IDQueue
 
 			}
 		}
+		if (IFQueue.empty())
+			break; //continue?
 		IDQueue.push(IFQueue.front());
 		IFQueue.pop();
-
+		//cout << "IDQueue.size(): " << IDQueue.size() << endl;
 	}
 }
 
-void ID_stage(ifstream& infile, queue<Node*> IFQueue, queue<Node*> IDQueue, queue<Node*>EXQueue,queue<Node*> after_WBQueue) {
+void ID_stage(ifstream& infile, queue<Node*>& IFQueue, queue<Node*>& IDQueue, queue<Node*>&EXQueue,queue<Node*>& after_WBQueue) {
 	IF_stage(infile, IFQueue);
 	Node* first_ID = NULL;
 	if (!IDQueue.empty())
@@ -300,7 +303,7 @@ void ID_stage(ifstream& infile, queue<Node*> IFQueue, queue<Node*> IDQueue, queu
 
 	//检查是否满足数据相关性
 	for (int i = 0; i < width; i++) {
-
+		//cout << "IDQueue.size(): " << IDQueue.size() << endl;
 		if (IDQueue.empty()) {
 			break;
 		}
@@ -317,6 +320,7 @@ void ID_stage(ifstream& infile, queue<Node*> IFQueue, queue<Node*> IDQueue, queu
 									//cout << IDQueue->head->instruction[0] << endl;
 			//						cout << "IDQueue first instruction3: " << IDQueue->first->instruction[0] << endl;
 			EXQueue.push(first_ID);
+			//cout << "111111" << endl; //有输出11111就是满足数据需求了
 			//pop(IDQueue);
 			remove(IDQueue, first_ID);
 		}
@@ -327,7 +331,7 @@ void ID_stage(ifstream& infile, queue<Node*> IFQueue, queue<Node*> IDQueue, queu
 	//circles++;
 }
 
-void EX_stage(ifstream& infile, queue<Node*> IFQueue, queue<Node*> IDQueue, queue<Node*>EXQueue, queue<Node*> MEMQueue,queue<Node*> after_WBQueue) {
+void EX_stage(ifstream& infile, queue<Node*>& IFQueue, queue<Node*>& IDQueue, queue<Node*>&EXQueue, queue<Node*>& MEMQueue,queue<Node*>& after_WBQueue) {
 	IF_stage(infile, IFQueue);
 	IF_to_ID_stage(infile, IFQueue, IDQueue);
 	ID_stage(infile, IFQueue, IDQueue, EXQueue, after_WBQueue);
@@ -338,7 +342,8 @@ void EX_stage(ifstream& infile, queue<Node*> IFQueue, queue<Node*> IDQueue, queu
 			first_EX = EXQueue.front()->next;
 		}
 	}
-
+	//cout <<"EXQueue.size(): " << EXQueue.size() << endl;
+	//cout << "EXQueue.front()->instruction[1]: " << EXQueue.front()->instruction[1] << endl;
 	for (int i = 0; i < width; i++) {
 
 		if (!EXQueue.empty()) {
@@ -346,15 +351,15 @@ void EX_stage(ifstream& infile, queue<Node*> IFQueue, queue<Node*> IDQueue, queu
 				MEMQueue.push(EXQueue.front());
 				EXQueue.pop();
 				circles++;
-				cout << "1111111111" << endl;
+				//cout << "1111111111" << endl;
 				stop_tag_branch = false;
 				break;
 			}
 
 
-			if (first_EX == NULL) {
+			/*if (first_EX == NULL) {
 				break;
-			}
+			}*/
 
 			//同时用一个功能单元
 			if (first_EX != NULL) {
@@ -372,7 +377,7 @@ void EX_stage(ifstream& infile, queue<Node*> IFQueue, queue<Node*> IDQueue, queu
 		//不共用一个功能单元，正常输出
 		MEMQueue.push(EXQueue.front());
 		EXQueue.pop();
-
+		
 		if (EXQueue.empty()) {
 			break;
 		}
@@ -386,7 +391,7 @@ void EX_stage(ifstream& infile, queue<Node*> IFQueue, queue<Node*> IDQueue, queu
 	//circles++;
 }
 
-void MEM_stage(ifstream& infile, queue<Node*> IFQueue, queue<Node*> IDQueue, queue<Node*>EXQueue, queue<Node*> MEMQueue,queue<Node*> WBQueue ,queue<Node*> after_WBQueue) {
+void MEM_stage(ifstream& infile, queue<Node*>& IFQueue, queue<Node*>& IDQueue, queue<Node*>&EXQueue, queue<Node*>& MEMQueue,queue<Node*>& WBQueue ,queue<Node*>& after_WBQueue) {
 	IF_stage(infile, IFQueue);
 	IF_to_ID_stage(infile, IFQueue, IDQueue);
 	ID_stage(infile, IFQueue, IDQueue, EXQueue, after_WBQueue);
@@ -399,6 +404,7 @@ void MEM_stage(ifstream& infile, queue<Node*> IFQueue, queue<Node*> IDQueue, que
 			first_MEM = MEMQueue.front()->next;
 		}
 	}
+	//cout << "MEMQueue.size(): " << MEMQueue.size() << endl;
 	for (int i = 0; i < width; i++) {
 		//同时用一个功能单元
 		if (first_MEM != NULL) {
@@ -413,6 +419,7 @@ void MEM_stage(ifstream& infile, queue<Node*> IFQueue, queue<Node*> IDQueue, que
 			break;
 		}
 		WBQueue.push(MEMQueue.front());
+		//cout << "WBQueue.size(): " << WBQueue.size() << endl;
 		MEMQueue.pop();
 		if (MEMQueue.empty()) {
 			break;
@@ -424,7 +431,7 @@ void MEM_stage(ifstream& infile, queue<Node*> IFQueue, queue<Node*> IDQueue, que
 	circles++;
 }
 
-void WB_stage(ifstream& infile, queue<Node*> IFQueue, queue<Node*> IDQueue, queue<Node*>EXQueue, queue<Node*> MEMQueue, queue<Node*> WBQueue, queue<Node*> after_WBQueue) {
+void WB_stage(ifstream& infile, queue<Node*>& IFQueue, queue<Node*>& IDQueue, queue<Node*>&EXQueue, queue<Node*>& MEMQueue, queue<Node*>& WBQueue, queue<Node*>& after_WBQueue) {
 	IF_stage(infile, IFQueue);
 	IF_to_ID_stage(infile, IFQueue, IDQueue);
 	ID_stage(infile, IFQueue, IDQueue, EXQueue, after_WBQueue);
@@ -438,33 +445,41 @@ void WB_stage(ifstream& infile, queue<Node*> IFQueue, queue<Node*> IDQueue, queu
 			first_WB = WBQueue.front()->next;
 		}
 	}
+	//cout << "WBQueue.size(): " << WBQueue.size() << endl;
 	for (int i = 0; i < width; i++) {
+		//cout << "1111111111" << endl;
+		//cout << "WBQueue.size(): " << WBQueue.size() << endl;
 		//同时用一个功能单元
 		if (first_WB != NULL) {
 			if (WBQueue.front()->instruction[1] == first_WB->instruction[1]) {
 				after_WBQueue.push(WBQueue.front());
+				//cout << "after_WBQueue.size() in delay: " << after_WBQueue.size() << endl;
 				WBQueue.pop();
 				//cout << "1111111111" << endl;
 				circles++;
 				break;
 			}
 		}
-		if (WBQueue.empty()) {
+		if (WBQueue.empty()) {	
 			break;
 		}
+
 		//cout << WBQueue->head->instruction[0] << endl;
 		after_WBQueue.push(WBQueue.front());
 		//					after_WBQueue->size++;
-
+		//cout << WBQueue.front()->instruction[0] << endl;
 		WBQueue.pop();
+		//cout << "WBQueue.size(): " << WBQueue.size() << endl;
 		if (WBQueue.empty()) {
-			break;
+			//break;
+			continue;
 		}
 
 		if (WBQueue.front()->next != NULL) {
 			first_WB = WBQueue.front()->next;
 		}
 	}
+	
 	circles++;
 }
 
@@ -787,6 +802,7 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 				
 			WB_stage(infile, IFQueue, IDQueue, EXQueue, MEMQueue, WBQueue, after_WBQueue);
 				//cout << after_WBQueue->tail->instruction[0] << endl;
+			//cout << "after_WBQueue.size(): " << after_WBQueue.size() << endl;
 			}
 			
 		}
@@ -806,11 +822,11 @@ void simulation(string file_name, int width, int start_line, int total_simulate_
 }
 
 int main(int argc, char* argv[]) {
-	file_name = "compute_int_0";
+	file_name = "srv_0";
 
-	width = 2;
+	width = 1;
 	start_line = 1;
-	total_simulate_lines = 1000000;
+	total_simulate_lines = 200;
 
 
 	cout << "start simulation" << endl;

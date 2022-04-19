@@ -19,7 +19,6 @@ public:
 	//vector[2 to end] = instruction_depends
 	vector<string> instruction;
 	Node* next;
-
 	Node();
 	Node(string instruction, string instruction_type, string instruction_depends);
 };
